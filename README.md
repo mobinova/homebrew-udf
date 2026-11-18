@@ -4,8 +4,11 @@ Install the UYAP UDF command-line tool on macOS or Linux:
 
 ```sh
 brew tap mobinova/udf
+brew trust mobinova/udf
 brew install mobinova/udf/udf
 ```
+
+Homebrew asks users to explicitly trust formulas from third-party taps before loading them.
 
 The formula installs the signed-checksum release binary from [mobinova/udf](https://github.com/mobinova/udf/releases). The daily updater reads the latest stable release and refreshes the formula version and checksums. To update immediately, run the `Update formula` workflow from the Actions tab.
 
