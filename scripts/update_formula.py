@@ -1,36 +1,37 @@
 #!/usr/bin/env python3
 """Refresh the Homebrew formula using the latest stable upstream release."""
 
-import json
 import re
 import urllib.request
 from pathlib import Path
 
-API = "https://api.github.com/repos/mobinova/udf/releases/latest"
+LATEST_CHECKSUMS = "https://github.com/mobinova/udf/releases/latest/download/checksums.txt"
 FORMULA = Path(__file__).resolve().parents[1] / "Formula" / "udf.rb"
 PLATFORMS = ("darwin_arm64", "darwin_amd64", "linux_arm64", "linux_amd64")
 
 
-def get(url: str) -> bytes:
+def get(url: str) -> tuple[bytes, str]:
     request = urllib.request.Request(url, headers={"User-Agent": "mobinova-homebrew-udf-updater"})
     with urllib.request.urlopen(request, timeout=30) as response:
-        return response.read()
+        return response.read(), response.geturl()
 
 
 def main() -> None:
-    release = json.loads(get(API))
-    tag = release["tag_name"]
-    if not tag.startswith("v"):
-        raise SystemExit(f"unexpected release tag: {tag!r}")
-    version = tag[1:]
-    assets = {asset["name"]: asset["browser_download_url"] for asset in release["assets"]}
-    if "checksums.txt" not in assets:
-        raise SystemExit("release has no checksums.txt asset")
+    checksum_data, _ = get(LATEST_CHECKSUMS)
     checksums = {}
-    for line in get(assets["checksums.txt"]).decode("utf-8").splitlines():
+    for line in checksum_data.decode("utf-8").splitlines():
         match = re.fullmatch(r"([0-9a-f]{64})\s+(.+)", line.strip())
         if match:
             checksums[match.group(2)] = match.group(1)
+
+    versions = {
+        match.group(1)
+        for filename in checksums
+        if (match := re.fullmatch(r"udf_(.+)_darwin_arm64\.tar\.gz", filename))
+    }
+    if len(versions) != 1:
+        raise SystemExit("could not determine a single version from release checksums")
+    version = versions.pop()
 
     formula = FORMULA.read_text(encoding="utf-8")
     formula, version_count = re.subn(r'(?m)^  version "[^"]+"$', f'  version "{version}"', formula)
